@@ -1,0 +1,17 @@
+{
+    "model": {
+        "results_path": "./results/uaisma/",
+        "experiment": "experiment_1/",
+        "name": "not_replace",
+        "lag": "18", 
+        "boost": "not_replace", 
+        "dropout": "0.5",
+        "lstm_neurons": "128", 
+        "fcn_neurons": "256", 
+        "fcn_layers": "8",
+        "n_class": "not_replace",
+        "normalized_ranges_2class": [0.0, 1.34],
+        "normalized_ranges_3class": [0.0, 1.34, 1.91],
+        "normalized_ranges_4class": [0.0, 1.34, 1.91, 2.48]
+    }
+}
