@@ -11,9 +11,6 @@
             "testing_fraction":0.2,
             "n_steps_boost_avg":1,
             "n_steps_lag_avg":1,
-            "allow_star_change" : "True",
-            "tracking_ra_field_name": "Target RA [deg]",
-            "tracking_dec_field_name": "Target DEC [deg]",
             "normalized_target_variance_range": [0.0, 1.0],
             "target_field": "not_replace",
             "training_fields": 

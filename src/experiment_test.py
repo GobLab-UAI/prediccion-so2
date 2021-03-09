@@ -9,7 +9,13 @@ import pandas
 import numpy
 import random
 
+# PARA USAR FUNCION DE PERDIDA F1 SE CARGA dnn_models_f1
 from nowcastlib.dnn_models_f1 import build_categorical_model
+
+# PARA USAR FUNCION DE PERDIDA CLASICA CROSS_ENTROPY SE CARGA dnn_models
+#from nowcastlib.dnn_models_f1 import build_categorical_model
+
+
 from nowcastlib.data_handlers import MaxCategorical
 
 from keras.callbacks import ModelCheckpoint
@@ -54,20 +60,7 @@ def configure_handler(ds_config, tr_config, md_config):
     norm_info = ds_config['normalization']
     norm_variance_range = ds_config['normalized_target_variance_range']
     allowed_dyn_range = ds_config['allowed_dyn_range']
-    allow_star_change = ds_config['allow_star_change']
-    ra_tracking_field = ds_config.get('tracking_ra_field_name', None)
-    dec_tracking_field = ds_config.get('tracking_dec_field_name', None)
-    filter_star_change = None
-    if allow_star_change == 'True':
-        filter_star_change = False
-    elif allow_star_change == 'False':
-        filter_star_change = True
-    else:
-        raise ValueError("allow_start_change must be True or False")
-    if allow_star_change and ra_tracking_field is None:
-        raise ValueError("allow_start_change = True needs ra field")
-    if allow_star_change and dec_tracking_field is None:
-        raise ValueError("allow_start_change = True needs dec field")
+
     
     number_class = int(md_config['n_class'])
 
@@ -93,11 +86,8 @@ def configure_handler(ds_config, tr_config, md_config):
     handler.set_normalization(norm_info)
     #handler.set_allowed_dyn_range(allowed_dyn_range[0], allowed_dyn_range[1])
     handler.set_allowed_std_range(norm_variance_range[0], norm_variance_range[1])
-    if filter_star_change:
-        handler.set_ra_dec_field_name(ra_tracking_field, dec_tracking_field)
     print('building dataset')
     handler.build_dataset(
-        filter_star_change=filter_star_change, 
         filter_by_std=True)
     print('done.')    
     return handler
@@ -144,6 +134,8 @@ if __name__ == '__main__':
     '''
     '''
     configure_tf()
+
+    # semilla definida para reproducir resultdos
     numpy.random.seed(2)
     random.seed(2)
     
@@ -196,6 +188,7 @@ if __name__ == '__main__':
     f1max=0
     f1maxnozero=0
     epochmax=0
+    # buscamos entre todos las epocas entrenadas, la que entrega mejor f1 score
     for ep in range(n_epochs):
         epoch=ep+1
         weights_path = os.path.join(output_path, "weights")
@@ -219,9 +212,11 @@ if __name__ == '__main__':
 
 
     print("best result epoch=",epochmax,' with f1_macro=',f1max)
-    # train model
+    # cargamos modelo con mejor f1 score
     ncast_model.load_weights(weights_filename_best)
-    # test model
+
+
+    # inferencia sobre el test
     pred_y1= ncast_model.predict(test_x1)
     rep = classification_report(test_y1.argmax(axis=1), pred_y1.argmax(axis=1))
     str_rep = "{}".format(rep)
@@ -235,6 +230,7 @@ if __name__ == '__main__':
     conf_matrix = confusion_matrix(test_y1.argmax(axis=1), pred_y1.argmax(axis=1))
     print(conf_matrix)
  
+    # Es el mejor f1 score, pero donde ninguna clase entregue 0 precision, puede pasar cuando hay muy pocos elementos en una clase.
     if f1maxnozero>0:
         print("best f1 non zero:",weights_filename_best2)
         ncast_model.load_weights(weights_filename_best2)
