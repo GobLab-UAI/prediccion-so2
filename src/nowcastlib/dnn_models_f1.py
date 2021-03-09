@@ -1,3 +1,6 @@
+# Colaboradores: Pedro Fluxá, Roberto González
+
+
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Flatten
 from tensorflow.keras.layers import Dense

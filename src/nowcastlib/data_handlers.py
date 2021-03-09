@@ -1,4 +1,6 @@
-#funciones de manejo y sincronizacion de datos.
+# Funciones de manejo y sincronizacion de datos.
+# Colaboradores: Pedro Fluxá, Roberto González
+
 import pandas
 import numpy
 
