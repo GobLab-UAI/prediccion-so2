@@ -9,7 +9,13 @@ import pandas
 import numpy
 import random
 
+# PARA USAR FUNCION DE PERDIDA F1 SE CARGA dnn_models_f1
 from nowcastlib.dnn_models_f1 import build_categorical_model
+
+# PARA USAR FUNCION DE PERDIDA CLASICA CROSS_ENTROPY SE CARGA dnn_models
+#from nowcastlib.dnn_models_f1 import build_categorical_model
+
+
 from nowcastlib.data_handlers import MaxCategorical
 
 from keras.callbacks import ModelCheckpoint
@@ -20,6 +26,7 @@ from sklearn.metrics import confusion_matrix
 
 import matplotlib.pyplot as plt
 
+# Esto reduce el consumo de memoria GPU, recordar que si no hay GPU igual deberia correr el codigo
 def configure_tf():
     '''function to make tensorflow don't take up all GPU memory
     '''
@@ -35,6 +42,7 @@ def configure_tf():
             # Memory growth must be set before GPUs have been initialized
             print(e)
 
+# Definicion de todos los parametros
 def configure_handler(ds_config, tr_config, md_config):
     '''
     '''    
@@ -55,22 +63,8 @@ def configure_handler(ds_config, tr_config, md_config):
     norm_info = ds_config['normalization']
     norm_variance_range = ds_config['normalized_target_variance_range']
     allowed_dyn_range = ds_config['allowed_dyn_range']
-    allow_star_change = ds_config['allow_star_change']
-    ra_tracking_field = ds_config.get('tracking_ra_field_name', None)
-    dec_tracking_field = ds_config.get('tracking_dec_field_name', None)
-    filter_star_change = None
-    if allow_star_change == 'True':
-        filter_star_change = False
-    elif allow_star_change == 'False':
-        filter_star_change = True
-    else:
-        raise ValueError("allow_start_change must be True or False")
-    if allow_star_change and ra_tracking_field is None:
-        raise ValueError("allow_start_change = True needs ra field")
-    if allow_star_change and dec_tracking_field is None:
-        raise ValueError("allow_start_change = True needs dec field")
-    
 
+    
     number_class = int(md_config['n_class'])
 
     if number_class == 2:
@@ -95,11 +89,8 @@ def configure_handler(ds_config, tr_config, md_config):
     handler.set_normalization(norm_info)
     handler.set_allowed_dyn_range(allowed_dyn_range[0], allowed_dyn_range[1])
     handler.set_allowed_std_range(norm_variance_range[0], norm_variance_range[1])
-    if filter_star_change:
-        handler.set_ra_dec_field_name(ra_tracking_field, dec_tracking_field)
     print('building dataset')
     handler.build_dataset(
-        filter_star_change=filter_star_change, 
         filter_by_std=True)
     print('done.')    
     return handler
@@ -146,9 +137,11 @@ if __name__ == '__main__':
     '''
     '''
     configure_tf()
+    # Semillas fijas para reproducir resultados
     numpy.random.seed(2)
     random.seed(2)
     
+    # parametros de entrada
     ds_conf_path = 'config/sma_uai_alldata.json'
     tr_conf_path = 'config/training_config.json'
     md_conf_path = 'config/model_config.json'
@@ -217,7 +210,7 @@ if __name__ == '__main__':
     test_x1 = testing_set_x[0]
     test_y1 = testing_set_y[0]
 
-    #print classe
+    #cuenta de elementos para entrenar por clase.
     nclass=train_y1.shape[1]
     nobj=train_y1.shape[0]
     ccla=numpy.zeros(nclass)
@@ -250,6 +243,15 @@ if __name__ == '__main__':
         raise ValueError("number of classes is not supported")
 
     # train model
+    # class weights define el peso que se debe asignar a los elementos de cada clase
+    # en el calculo de la loss function. es bastante sensible y determina la convergencia
+    # por ejemplo si el numero de elementos de clase 1 es 10 veces mayor que la clase 2,
+    # y classweights=(1,1) resultaria en precision ~90% clase 1 y muy bajo la clase 2
+    # si ahora para el mismo entrenamiento seleccionamos
+    # classweithds=(1,10) resultara probablemente en algo asi como precision clase1=70%, precision clase2=60%
+    # para desproporciones muy grandes entre clases de 2 o mas ordenes de magnitud, este balance no funciona muy bien
+    # se recomienda no usar un desbalance mayor que 50-60 aunque la desproporcion sea mucho mayor, sino nunca
+    # bajaria la loss function y quizas no se observaria convergencia.
     train_history = ncast_model.fit(
         train_x1, train_y1,
         batch_size=int(tr_conf['training']['batch_size']), 
@@ -264,6 +266,11 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
     plt.plot(loss)
     plt.savefig(loss_plot_path)
+
+
+
+    # aca en realidad puede ser mas interesante mirar la prediccion contra train_x1 
+    # para saber que tan bien aprendio a modelar el problema y si hay hay overfit!!!
 
     # test model
     pred_y1= ncast_model.predict(test_x1)
