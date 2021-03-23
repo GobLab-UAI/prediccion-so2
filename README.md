@@ -44,6 +44,8 @@ Estan en formato JSON y se deben generar 3 archivos minimo:
 
 * generator_inference_filetest.py: código generico inferencias 
 
+* build_dataset.py: Toma 2 o mas archivos .csv con con datos de series de tiempo, los sincroniza, genera bloques continuos(chunks) y almacena en formato .hdf5.
+
 ### nowcastlib/
 
 * data_handlers.py; funciones de manipulación de datos de series de tiempo, generacion de bloques, sincronización.
