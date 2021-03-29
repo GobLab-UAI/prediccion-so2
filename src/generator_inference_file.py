@@ -1,5 +1,5 @@
-#from silence_tensorflow import silence_tensorflow
-#silence_tensorflow()
+from silence_tensorflow import silence_tensorflow
+silence_tensorflow()
 import tensorflow as tf
 
 import pickle
@@ -11,14 +11,7 @@ import pandas
 import numpy
 import random
 
-
-# PARA USAR FUNCION DE PERDIDA F1 SE CARGA dnn_models_f1
 from nowcastlib.dnn_models_f1 import build_categorical_model
-
-# PARA USAR FUNCION DE PERDIDA CLASICA CROSS_ENTROPY SE CARGA dnn_models
-#from nowcastlib.dnn_models_f1 import build_categorical_model
-
-
 from nowcastlib.data_handlers import MaxCategorical
 
 from keras.callbacks import ModelCheckpoint
@@ -78,23 +71,24 @@ def configure_handler(ds_config, tr_config, md_config):
 
     lag = int(md_config['lag'])
     boost = int(md_config['boost'])
-
+    boost_out = int(md_config['boost_out'])
+    
     handler = MaxCategorical(hdf_path, training_fields, target_field)
     handler.set_stride(stride)
     handler.set_trainval_frac(1.0 - test_frac)
     handler.set_lag(lag)
     handler.set_boost(boost)
+    handler.set_boost_out(boost_out)
     handler.set_ranges(ranges)
     handler.set_boost_avg_steps(n_boost_avg)
     handler.set_normalization(norm_info)
-    #handler.set_allowed_dyn_range(allowed_dyn_range[0], allowed_dyn_range[1])
+    handler.set_allowed_dyn_range(allowed_dyn_range[0], allowed_dyn_range[1])
     handler.set_allowed_std_range(norm_variance_range[0], norm_variance_range[1])
     print('building dataset')
     handler.build_dataset(
         filter_by_std=True)
     print('done.')    
-    return handler
-    
+    return handler    
 
 if __name__ == '__main__':
     '''
@@ -130,29 +124,38 @@ if __name__ == '__main__':
     md_conf['n_class'] = str(n_class) 
     tr_conf['dataset']['target_field'] = str(estacion) + '_so2_ppb'
     
-    # create output folder. abort if folder exists
-    output_path = os.path.join(md_conf['results_path'], md_conf['name'])
-    if not os.path.isdir(output_path):
-        os.makedirs(output_path)
-        print("created folder : ", output_path)
+    # create model-checkpoint folder. overwrite weights if already exists
+    file_path = os.path.join("./inference_files")
+    if not os.path.isdir(file_path):
+        os.makedirs(file_path)
+        print("created folder : ", file_path)
     else:
-        print(output_path, "folder already exists.")
-        #sys.exit(-1)
+        print(file_path, "folder already exists.")
 
     data_handler = configure_handler(ds_conf, tr_conf, md_conf)
     tkeys = data_handler.get_testing_keys()
         
+    # get training set
+    training_set_x, training_set_y = data_handler.get_training_set()
+    train_x1 = training_set_x[0]
+    train_y1 = training_set_y[0]
+
     # get testing set
     testing_set_x, testing_set_y = data_handler.get_testing_set()
     test_x1 = testing_set_x[0]
     test_y1 = testing_set_y[0]
+    
+    # Save train set for future inferences
+    outfile = '_inference_c' + str(n_class) + '_h' + str(boost) + '.pkl'
+    with open('inference_files/trainx'+ outfile, 'wb') as handle:
+        pickle.dump(train_x1, handle)
+    with open('inference_files/trainy'+ outfile, 'wb') as handle:
+        pickle.dump(train_y1, handle)
 
     # Save test set for future inferences
     outfile = '_inference_c' + str(n_class) + '_h' + str(boost) + '.pkl'
-    with open('testx'+ outfile, 'wb') as handle:
+    with open('inference_files/testx'+ outfile, 'wb') as handle:
         pickle.dump(test_x1, handle)
-    with open('testy'+ outfile, 'wb') as handle:
+    with open('inference_files/testy'+ outfile, 'wb') as handle:
         pickle.dump(test_y1, handle)
-       
-
- 
+        

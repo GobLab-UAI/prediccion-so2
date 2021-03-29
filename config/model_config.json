@@ -5,6 +5,7 @@
         "name": "not_replace",
         "lag": "18", 
         "boost": "not_replace", 
+        "boost_out": "8",
         "dropout": "0.5",
         "lstm_neurons": "128", 
         "fcn_neurons": "256", 

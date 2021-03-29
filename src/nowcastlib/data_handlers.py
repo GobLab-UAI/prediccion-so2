@@ -1,8 +1,8 @@
 # Funciones de manejo y sincronizacion de datos.
 # Colaboradores: Pedro Fluxá, Roberto González
 
-import pandas
-import numpy
+import pandas as pd
+import numpy as np
 
 
 #clase genérica de manejo de datos
@@ -44,7 +44,7 @@ class BaseHandler(object):
     def __init__(self, path_to_hdf, x_col_names, name_of_y_col, max_df):
         '''
         '''
-        self._hdf_store = pandas.HDFStore(path_to_hdf)
+        self._hdf_store = pd.HDFStore(path_to_hdf)
         df_list = self._hdf_store.keys()
         self._hdf_store.close()
         
@@ -71,9 +71,9 @@ class BaseHandler(object):
             raise ValueError("smooth only accepts 1 dimension arrays.")
         if x.size < window_len:
             raise ValueError("Input vector needs to be bigger than window size.")
-        w = numpy.ones(window_len, 'd')
-        xp = numpy.concatenate([w*x[0], x, w*x[-1]])
-        xc = numpy.convolve(w/w.sum(), xp, mode='same')
+        w = np.ones(window_len, 'd')
+        xp = np.concatenate([w*x[0], x, w*x[-1]])
+        xc = np.convolve(w/w.sum(), xp, mode='same')
         y = xc[window_len:-window_len]
         return y
 
@@ -109,6 +109,11 @@ class BaseHandler(object):
         '''
         self._boost = int(b)
     
+    def set_boost_out(self, c):
+        '''
+        '''
+        self._boost_out = int(c)
+
     def set_normalization(self, norm_dict):
         '''
         '''
@@ -147,7 +152,7 @@ class BaseHandler(object):
     def check_block_variance(self, block_data):
         '''
         '''
-        std_data = numpy.std(block_data)
+        std_data = np.std(block_data)
         if std_data < self._allowed_std_range[0]:
             return True
         if std_data > self._allowed_std_range[1]:
@@ -170,6 +175,7 @@ class BaseHandler(object):
     #funcion principal de sincronizacion y creacion de chunks
     def blocks_from_dataframe(self, 
         dataframe, 
+        filter_star_change, only_star_change, 
         filter_by_std, only_out_of_range):
         '''
         '''
@@ -232,9 +238,9 @@ class BaseHandler(object):
             ix += self._block_stride
             iy += self._block_stride
         
-        lag_blocks_x = numpy.asarray(lag_blocks_x, dtype='float32')
-        lag_blocks_y = numpy.asarray(lag_blocks_y, dtype='float32')
-        boost_blocks = numpy.asarray(boost_blocks, dtype='float32')
+        lag_blocks_x = np.asarray(lag_blocks_x, dtype='float32')
+        lag_blocks_y = np.asarray(lag_blocks_y, dtype='float32')
+        boost_blocks = np.asarray(boost_blocks, dtype='float32')
         
         return bad_block, lag_blocks_x, lag_blocks_y, boost_blocks
 
@@ -268,8 +274,8 @@ class MaxCategorical(BaseHandler):
         zf = zip(lag_blocks_x, lag_blocks_y, boost_blocks)
         for lag_data_x, lag_data_y, boost_data in zf:
  
-            # En esta parte se seleccionan los ultimos 8 boost para la prediccion
-            ii = len(boost_data)-8
+            # En esta parte se seleccionan los ultimos boost_out para la prediccion
+            ii = len(boost_data) - self._boost_out
             if ii<0:
                 ii=0
 
@@ -277,29 +283,30 @@ class MaxCategorical(BaseHandler):
             max_avg = -1e10
             while ii + self.n_max_avg < len(boost_data):
                 yw = boost_data[ii:ii+self.n_max_avg, :].ravel()
-                local_avg = numpy.max(yw) #from ave to max ROB
+                local_avg = np.max(yw) #from ave to max ROB
                 if local_avg > max_avg:
                     max_avg = local_avg
                 ii += 1
             # truncate negative values
             if max_avg < 0:
                 max_avg = 1e-5
-            ranges = numpy.zeros(self.n_ranges, dtype='float32')                
+            ranges = np.zeros(self.n_ranges, dtype='float32')                
             for i_r in range(self.n_ranges):
                 lr = self.ranges[i_r]
                 rr = self.ranges[i_r+1]
                 if max_avg >= lr and max_avg < rr:
                     ranges[i_r] = 1.0
-            ranges_ok = numpy.sum(ranges) == 1.0
+            ranges_ok = np.sum(ranges) == 1.0
             # this should never happen
             if not ranges_ok:
                 raise RuntimeError("bad range output")
             rngs.append(ranges)
-        rngs = numpy.asarray(rngs, dtype='float32')        
+        rngs = np.asarray(rngs, dtype='float32')        
         return rngs
 
     # rutina principal de generacion del dataset
     def build_dataset(self,
+        filter_star_change=False, only_star_change=False, 
         filter_by_std=False, only_out_of_range=False):
         '''
         '''
@@ -309,16 +316,16 @@ class MaxCategorical(BaseHandler):
         shape_x1 = (1, self._lag, len(self._x_col_names))
         shape_y1 = (1, self.n_ranges)
         
-        test_x1 = numpy.zeros(shape_x1)
-        test_y1 = numpy.zeros(shape_y1)
+        test_x1 = np.zeros(shape_x1)
+        test_y1 = np.zeros(shape_y1)
         
-        train_x1 = numpy.zeros(shape_x1)
-        train_y1 = numpy.zeros(shape_y1)
+        train_x1 = np.zeros(shape_x1)
+        train_y1 = np.zeros(shape_y1)
         
         n_chunks = len(self._df_list)
         testfrac = 1.0 - self._trainval_frac
         # randomiza que chunks van a train o test siguiendo la fraccion testfrac
-        test_or_train = numpy.random.choice(
+        test_or_train = np.random.choice(
             ['test', 'train'], p=(testfrac, self._trainval_frac), 
             size=n_chunks, replace=True)
  
@@ -327,7 +334,7 @@ class MaxCategorical(BaseHandler):
         nsamp_train = 0
         self._hdf_store.open()
         for df_key, flag in zip(self._df_list, test_or_train):
-            df = pandas.read_hdf(self._hdf_store, df_key)
+            df = pd.read_hdf(self._hdf_store, df_key)
             bad_block, lag_blocks_x, lag_blocks_y, boost_blocks = \
                 self.blocks_from_dataframe(
                     df, 
@@ -345,13 +352,13 @@ class MaxCategorical(BaseHandler):
 
             # asignacion del bloque a train/test
             if flag == 'test':
-                test_x1 = numpy.vstack([test_x1, lag_blocks_x])
-                test_y1 = numpy.vstack([test_y1, rngs])
+                test_x1 = np.vstack([test_x1, lag_blocks_x])
+                test_y1 = np.vstack([test_y1, rngs])
                 self._testing_keys.append(df_key)
                 nsamp_test += len(df)
             if flag == 'train':
-                train_x1 = numpy.vstack([train_x1, lag_blocks_x])
-                train_y1 = numpy.vstack([train_y1, rngs])
+                train_x1 = np.vstack([train_x1, lag_blocks_x])
+                train_y1 = np.vstack([train_y1, rngs])
                 self._training_keys.append(df_key)
                 nsamp_train += len(df)
             print(df_key," testing nsamp = ", nsamp_test, "training nsamp = ", nsamp_train)

@@ -75,7 +75,8 @@ def configure_handler(ds_config, tr_config, md_config):
 
     lag = int(md_config['lag'])
     boost = int(md_config['boost'])
-
+    boost_out = int(md_config['boost_out'])
+    
     handler = MaxCategorical(hdf_path, training_fields, target_field)
     handler.set_stride(stride)
     handler.set_trainval_frac(1.0 - test_frac)
